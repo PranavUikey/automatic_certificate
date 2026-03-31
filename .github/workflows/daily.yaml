@@ -32,8 +32,9 @@ jobs:
             - name: Install dependencies
               run: pip install -r requirements.txt
             
-            # - name: Fetch Users
-            #   run: python get_user_details.py
+            - name: Setup Python path
+              run: |
+                echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
             
             - name: Check Progress
               run: python check_progress_changes.py

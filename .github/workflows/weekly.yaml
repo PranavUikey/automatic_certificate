@@ -32,6 +32,9 @@ jobs:
             - name: Install dependencies
               run: pip install -r requirements.txt
             
-            
+            - name: Setup Python path
+              run: |
+                echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
+                
             - name: Send Certificates to Admin
               run: python admin_mailer.py
