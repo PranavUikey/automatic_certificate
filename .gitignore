@@ -1,7 +1,5 @@
 certificates/
 *.env
-moodle/
-services/
 venv/
 __pycache__/
 *.pyc
@@ -20,5 +18,4 @@ __pycache__/
 *.tar.gz
 *.tgz
 config.pyc
-config.py
 config.yaml
