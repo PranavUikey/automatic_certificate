@@ -21,3 +21,4 @@ __pycache__/
 *.tgz
 config.pyc
 config.py
+config.yaml

@@ -1,0 +1,45 @@
+name: Automate Certificate_Sender
+on:
+  schedule:
+    - cron: '45 9 * * *' # Runs every day at 9:45 AM UTC( 3:15 PM IST)
+  workflow_dispatch: # Allows manual triggering of the workflow 
+
+jobs:
+    send_certificates:
+
+        runs-on: ubuntu-latest
+        env:
+            AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
+            AWS_REGION: ${{ secrets.AWS_REGION }}
+            EMAIL_USER: ${{ secrets.EMAIL_USER }}
+            EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+            SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+            SMTP_PORT: ${{ secrets.SMTP_PORT }}
+            ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v2
+            
+            - name: Setup Python
+              uses: actions/setup-python@v4
+              
+              with:
+                python-version: '3.11'
+            
+
+            - name: Install dependencies
+              run: pip install -r requirements.txt
+            
+            # - name: Fetch Users
+            #   run: python get_user_details.py
+            
+            - name: Check Progress
+              run: python check_progress_changes.py
+
+            - name: Generate Certificates
+              run: python create_cert.py
+
+            - name: Send Certificates to students
+              run: python student_mailer.py

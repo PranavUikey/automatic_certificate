@@ -4,17 +4,76 @@ from datetime import datetime
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from PyPDF2 import PdfReader, PdfWriter
+import yaml
+import boto3
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 # =========================
 # CONFIG
 # =========================
-BASE_CERT_DIR = "certificates"
-EXCEL_FILE = "Auto_Certificates_Sent.xlsx"
+
+BASE_CERT_DIR = os.getenv('CERTIFICATES_DIRECTORY')  
 
 PAGE_WIDTH = 842.25
 PAGE_HEIGHT = 604.08
 
+
+# =========================
+# AWS S3 CONFIG
+# =========================
+s3 = boto3.client(
+    's3',
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+    region_name=os.getenv('AWS_REGION')
+)
+
+BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')  # S3 bucket name
+EXCEL_KEY = os.getenv('EXCEL_FILE')   # e.g. certificates/Auto_Certificates_Sent.xlsx
+
+LOCAL_FILE = os.getenv('EXCEL_TEMP_FILE')  # Local temp file for processing
+# =========================
+# S3 UPLOAD FUNCTION
+# =========================
+
+def download_excel():
+    try:
+        s3.download_file(BUCKET_NAME, EXCEL_KEY, LOCAL_FILE)
+        print("📥 Excel downloaded from S3")
+        return True
+    except Exception as e:
+        print(f"⚠ No existing Excel found on S3: {e}")
+        return False
+
+def upload_certificate(file_path, course, year, month):
+
+    file_name = os.path.basename(file_path)
+    s3_key = f"certificates/{course}/{year}/{month}/{file_name}"
+
+    try:
+
+        s3.upload_file(file_path, BUCKET_NAME, s3_key)
+
+        url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{s3_key}"
+
+        print(f"   ☁ Uploaded to S3: {url}")
+        os.remove(s3_key)
+        return url
+
+    except Exception as e:
+        print(f"   ❌ S3 upload failed: {e}")
+        return None
+
+def upload_excel():
+    try:
+        s3.upload_file(LOCAL_FILE, BUCKET_NAME, EXCEL_KEY)
+        print("☁ Excel uploaded to S3")
+    except Exception as e:
+        print(f"❌ Upload failed: {e}")
 
 # =========================
 # CERTIFICATE ID GENERATOR
@@ -47,7 +106,6 @@ def create_overlay(output_file, name, certificate_id, date):
 
     name = name.title()
 
-    # Verification URL
     c.setFont("Helvetica", 8)
     c.drawString(
         60,
@@ -55,7 +113,6 @@ def create_overlay(output_file, name, certificate_id, date):
         f"https://www.aiadventures.in/certificate/?certificate={certificate_id}"
     )
 
-    # Student Name
     c.setFont("Helvetica-Bold", 26)
     c.drawCentredString(PAGE_WIDTH / 2, 340, name)
 
@@ -63,15 +120,11 @@ def create_overlay(output_file, name, certificate_id, date):
     x_start = (PAGE_WIDTH / 2) - (text_width / 2)
     x_end = (PAGE_WIDTH / 2) + (text_width / 2)
 
-    underline_y = 340 - 5
     c.setLineWidth(1.2)
-    c.line(x_start, underline_y, x_end, underline_y)
+    c.line(x_start, 335, x_end, 335)
 
-    # Certificate ID
     c.setFont("Helvetica", 14)
     c.drawString(130, 233, certificate_id)
-
-    # Date
     c.drawString(660, 227, date)
 
     c.save()
@@ -110,7 +163,6 @@ def process_excel(file_path):
     current_month = datetime.now().strftime("%B")
     today_date = datetime.now().strftime("%d %b %Y")
 
-    # 🔥 Load all sheets into memory ONCE
     sheets_data = {}
 
     for sheet in xls.sheet_names:
@@ -121,8 +173,12 @@ def process_excel(file_path):
 
         if "Issue_Date" not in df.columns:
             df["Issue_Date"] = ""
+
         if "Certificate_ID" not in df.columns:
             df["Certificate_ID"] = ""
+
+        if "Certificate_Path" not in df.columns:
+            df["Certificate_Path"] = ""
 
         sheets_data[sheet] = df
 
@@ -147,8 +203,8 @@ def process_excel(file_path):
         print(f"\n📘 Processing Course: {sheet_name}")
 
         for index, row in df.iterrows():
+            
 
-            # 🔥 Skip already issued
             if row["Certificate_Issued"] == 1:
                 continue
 
@@ -159,59 +215,51 @@ def process_excel(file_path):
                 cert_id = generate_certificate_id(sheet_name, student_id)
                 issue_date = datetime.now().strftime("%d %b %Y")
 
-                overlay_path = os.path.join(
-                    output_folder,
-                    f"overlay_{student_id}.pdf"
-                )
-
+                overlay_path = os.path.join(output_folder, f"overlay_{student_id}.pdf")
                 safe_name = name.replace(" ", "_")
-                final_path = os.path.join(
-                    output_folder,
-                    f"{safe_name}_{student_id}.pdf"
-                )
+                final_path = os.path.join(output_folder, f"{safe_name}_{student_id}.pdf")
 
-                create_overlay(
-                    output_file=overlay_path,
-                    name=name,
-                    certificate_id=cert_id,
-                    date=issue_date
-                )
-
-                generate_final_certificate(
-                    template_path,
-                    overlay_path,
-                    final_path
-                )
+                create_overlay(overlay_path, name, cert_id, issue_date)
+                generate_final_certificate(template_path, overlay_path, final_path)
 
                 os.remove(overlay_path)
 
-                # 🔥 Update in memory only
+                # 🚀 UPLOAD TO S3
+                s3_url = upload_certificate(final_path, sheet_name, current_year, current_month)
+
+                if not s3_url:
+                    print("   ❌ Skipping due to upload failure")
+                    continue
+
+                # 🧹 Delete local file after upload
+                os.remove(final_path)
+
+                # 🔥 Update Excel
                 sheets_data[sheet_name].loc[index, "Certificate_Issued"] = 1
                 sheets_data[sheet_name].loc[index, "Issue_Date"] = today_date
                 sheets_data[sheet_name].loc[index, "Certificate_ID"] = cert_id
+                sheets_data[sheet_name].loc[index, "Certificate_Path"] = s3_url
 
-                print(f"   ✓ Generated: {final_path}")
-
+                print(f"   ✓ Uploaded + Saved URL")
             except Exception as e:
                 print(f"   ❌ Error processing row: {e}")
 
     # ---------------------------
-    # SAFE SAVE (ATOMIC WRITE)
+    # SAFE SAVE
     # ---------------------------
-    base_name, ext = os.path.splitext(file_path)
-    temp_file = base_name + "_temp" + ext
 
-    with pd.ExcelWriter(temp_file, engine="openpyxl") as writer:
+    with pd.ExcelWriter(LOCAL_FILE, engine="openpyxl") as writer:
         for sheet, df in sheets_data.items():
             df.to_excel(writer, sheet_name=sheet[:31], index=False)
-
-    os.replace(temp_file, file_path)
-
-    print("\n🎉 All certificates generated and Excel safely updated!")
+    upload_excel()
+    # os.remove(BASE_CERT_DIR)
+    print("\n🎉 Certificates uploaded to S3 and Excel updated!")
 
 
 # =========================
 # ENTRY POINT
 # =========================
 if __name__ == "__main__":
-    process_excel(EXCEL_FILE)
+    process_excel(LOCAL_FILE)
+
+

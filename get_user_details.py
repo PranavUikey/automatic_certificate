@@ -4,6 +4,54 @@ from tqdm import tqdm
 import time
 import re
 import os
+import yaml
+import boto3
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# =========================
+# CONFIG
+# =========================
+
+
+EXCEL_KEY = os.getenv('EXCEL_KEY')  # S3 key (e.g. certificates/Auto_Certificates.xlsx)
+BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')  # S3 bucket name
+
+LOCAL_FILE = os.getenv('EXCEL_TEMP_FILE')  # Local temp file for processing
+
+CERTIFICATE_SHEET = os.getenv('EXCEL_CERTIFICATES_SHEET')  # Local path to certificates Excel (for lookup)
+
+# =========================
+# S3 SETUP
+# =========================
+s3 = boto3.client(
+    's3',
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+    region_name=os.getenv('AWS_REGION')
+)
+
+
+# =========================
+# S3 FUNCTIONS
+# =========================
+def download_excel():
+    try:
+        s3.download_file(BUCKET_NAME, EXCEL_KEY, LOCAL_FILE)
+        print("📥 Excel downloaded from S3")
+        return True
+    except Exception as e:
+        print(f"❌ Download failed: {e}")
+        return False
+
+
+def upload_excel():
+    try:
+        s3.upload_file(LOCAL_FILE, BUCKET_NAME, EXCEL_KEY)
+        print("☁ Excel uploaded to S3")
+    except Exception as e:
+        print(f"❌ Upload failed: {e}")
 
 
 # =====================================
@@ -30,10 +78,10 @@ def clean_name(name):
 # BUILD CERTIFICATE LOOKUP
 # =====================================
 def build_certificate_lookup():
-    if not os.path.exists("Certificates.xlsx"):
+    if not os.path.exists(CERTIFICATE_SHEET):
         return {}
 
-    xls = pd.ExcelFile("Certificates.xlsx")
+    xls = pd.ExcelFile(CERTIFICATE_SHEET)
     name_to_sheet = {}
 
     for sheet_name in xls.sheet_names:
@@ -75,20 +123,19 @@ def check_user(used_name: str, course_name: str):
 
 
 # =====================================
-# SAVE TO EXCEL
+# SAVE TO EXCEL (LOCAL TEMP)
 # =====================================
-def save_users_to_excel(course_to_users, filename="Auto_Certificates_Sent.xlsx"):
+def save_users_to_excel(course_to_users,filename = LOCAL_FILE):
     with pd.ExcelWriter(filename) as writer:
         for course, users_list in course_to_users.items():
             df = pd.DataFrame(users_list)
 
-            # Ensure Certificate_Issued column exists
             if "Certificate_Issued" not in df.columns:
                 df["Certificate_Issued"] = 0
 
             df.to_excel(writer, sheet_name=course[:31], index=False)
 
-    print(f"✓ Excel updated: {filename}")
+    print("💾 Excel updated locally")
 
 
 def safe_get_user_courses(user_id, retries=3):
@@ -108,22 +155,27 @@ def safe_get_user_courses(user_id, retries=3):
 # =====================================
 if __name__ == "__main__":
 
-    print("🔍 Loading existing sheet...")
+    print("🚀 Starting Moodle → S3 Sync")
 
-    existing_users = {}
+    # STEP 1: Download Excel
+    if not download_excel():
+        print("No previous Excel found. Creating new.")
+        existing_users = {}
+    else:
+        existing_users = {}
+
     final_output = {}
 
     # ---------------------------------
     # LOAD EXISTING EXCEL
     # ---------------------------------
-    if os.path.exists("Auto_Certificates_Sent.xlsx"):
-        xls_existing = pd.ExcelFile("Auto_Certificates_Sent.xlsx")
+    if os.path.exists(LOCAL_FILE):
+        xls_existing = pd.ExcelFile(LOCAL_FILE)
 
         for sheet in xls_existing.sheet_names:
             df_existing = pd.read_excel(xls_existing, sheet_name=sheet)
 
             if not df_existing.empty:
-                # Ensure column exists
                 if "Certificate_Issued" not in df_existing.columns:
                     df_existing["Certificate_Issued"] = 0
 
@@ -132,8 +184,6 @@ if __name__ == "__main__":
             else:
                 final_output[sheet] = []
                 existing_users[sheet] = set()
-    else:
-        print("No previous Excel found. Creating new.")
 
     # ---------------------------------
     # SCAN MOODLE
@@ -153,16 +203,10 @@ if __name__ == "__main__":
 
             has_certificate = check_user(user["fullname"], course_name)
 
-            course_progress = course.get("progress", 0)
-            if course_progress is None:
-                course_progress = 0
-            # Set progress threshold
-            course_lower = course_name.lower()
+            course_progress = course.get("progress", 0) or 0
 
-            if "python" in course_lower:
-                required_progress = 70
-            else:
-                required_progress = 90
+            course_lower = course_name.lower()
+            required_progress = 70 if "python" in course_lower else 90
 
             if not has_certificate and course_progress >= required_progress:
 
@@ -178,19 +222,15 @@ if __name__ == "__main__":
                     "Name": user["fullname"],
                     "Email": user["email"],
                     "Progress": f"{course_progress:.2f}%",
-                    "Certificate_Issued": 0  # 🔥 Always 0 for NEW entries
+                    "Certificate_Issued": 0
                 })
 
                 existing_users[course_name].add(user["id"])
 
     # ---------------------------------
-    # SAVE UPDATED FILE
+    # SAVE + UPLOAD
     # ---------------------------------
     save_users_to_excel(final_output)
+    upload_excel()
 
-    print("✅ Sheet updated successfully.")
-
-
-
-
-
+    print("✅ Sheet updated successfully in S3.")

@@ -1,0 +1,31 @@
+<html>
+  <body style="font-family: Arial, sans-serif; line-height:1.6;">
+
+    <p>Hi <b>{name}</b>,</p>
+
+    <p>🎉 Congratulations on your achievement!</p>
+
+    <p>
+      This certificate reflects your <b>hard work, dedication, and consistency</b>.
+      Keep learning, keep building — your journey has just started 🚀
+    </p>
+
+    <p style="font-style: italic;">
+      "Success doesn’t come from what you do occasionally,
+      it comes from what you do consistently."
+    </p>
+
+    <p>We are proud of you 👏</p>
+
+    <br>
+
+    <p>Best Regards,<br>
+    <b>AIAdventures Pune</b></p>
+
+    <br><br>
+
+    <!-- Footer Image -->
+    <img src="https://course.aiadventures.in/pluginfile.php/1/core_admin/logocompact/300x300/1733302504/aiadventures.png" width="200">
+
+  </body>
+</html>
