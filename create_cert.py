@@ -79,8 +79,6 @@ def download_excel():
 # =========================
 def upload_certificate(file_path, course, year, month):
 
-
-
     file_name = os.path.basename(file_path)
     s3_key = f"certificates/{course}/{year}/{month}/{file_name}"
 
@@ -238,12 +236,12 @@ def process_excel(file_path):
                 os.remove(overlay_path)
 
                 s3_url = upload_certificate(final_path, sheet_name, current_year, current_month)
-
+                print(f"   🔗 Certificate URL: {s3_url}")
                 if not s3_url:
                     continue
 
                 
-
+                print("Updating column values in DataFrame...")
                 sheets_data[sheet_name].loc[index, "Certificate_Issued"] = 1
                 sheets_data[sheet_name].loc[index, "Issue_Date"] = today_date
                 sheets_data[sheet_name].loc[index, "Certificate_ID"] = cert_id
@@ -251,6 +249,8 @@ def process_excel(file_path):
 
                 print("   ✓ Done")
                 os.remove(final_path)
+
+                print("   ✅ Certificates done")
             except Exception as e:
                 print(f"   ❌ Error: {e}")
 
