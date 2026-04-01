@@ -46,8 +46,8 @@ jobs:
               run: |
                 echo "PYTHONPATH=${{ github.workspace }}" >> $GITHUB_ENV
             
-            - name: Check Progress
-              run: python check_progress_changes.py
+            # - name: Check Progress
+            #   run: python check_progress_changes.py
 
             - name: Generate Certificates
               run: python create_cert.py
