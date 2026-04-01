@@ -3,7 +3,6 @@ import zipfile
 import smtplib
 from email.message import EmailMessage
 import boto3
-import yaml
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,9 +11,9 @@ load_dotenv()
 # CONFIG
 # =========================
 
-BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')  # S3 bucket name
-EXCEL_KEY = os.getenv('EXCEL_FILE')   # S3 key for Excel file
-CACHE_KEY = os.getenv('ORIG_JSON_FILE')  # S3 key for progress cache
+BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')
+EXCEL_KEY = os.getenv('EXCEL_FILE')
+CACHE_KEY = os.getenv('ORIG_JSON_FILE')
 
 EMAIL_ADDRESS = os.getenv('SMTP_EMAIL')
 EMAIL_PASSWORD = os.getenv('SMTP_PASSWORD')
@@ -39,27 +38,25 @@ s3 = boto3.client(
 def download_course_folders():
     course_files = {}
 
-    response = s3.list_objects_v2(
-        Bucket=BUCKET_NAME,
-        Prefix="certificates/"
-    )
+    paginator = s3.get_paginator('list_objects_v2')
 
-    for obj in response.get("Contents", []):
-        key = obj["Key"]
+    for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix="certificates/"):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
 
-        if not key.endswith(".pdf"):
-            continue
+            if not key.endswith(".pdf"):
+                continue
 
-        parts = key.split("/")
-        if len(parts) < 2:
-            continue
+            parts = key.split("/")
+            if len(parts) < 2:
+                continue
 
-        course = parts[1]
+            course = parts[1]
 
-        if course not in course_files:
-            course_files[course] = []
+            if course not in course_files:
+                course_files[course] = []
 
-        course_files[course].append(key)
+            course_files[course].append(key)
 
     for course, keys in course_files.items():
         os.makedirs(course, exist_ok=True)
@@ -76,7 +73,6 @@ def download_course_folders():
 # ZIP COURSE FOLDERS
 # =========================
 def zip_course_folders(course_list):
-
     zip_files = []
 
     for course in course_list:
@@ -97,7 +93,6 @@ def zip_course_folders(course_list):
 # UPLOAD + PRESIGNED URL
 # =========================
 def upload_and_get_link(zip_file):
-
     key = f"weekly_reports/{zip_file}"
 
     s3.upload_file(zip_file, BUCKET_NAME, key)
@@ -105,7 +100,7 @@ def upload_and_get_link(zip_file):
     url = s3.generate_presigned_url(
         'get_object',
         Params={'Bucket': BUCKET_NAME, 'Key': key},
-        ExpiresIn=604800  # 7 days
+        ExpiresIn=604800
     )
 
     return url
@@ -124,9 +119,8 @@ def cleanup_course_folders(course_list):
 # DOWNLOAD EXCEL + CACHE
 # =========================
 def download_excel_and_cache():
-
-    excel_local = os.getenv('EXCEL_TEMP_FILE')  # Local temp file for Excel
-    cache_local = os.getenv('JSON_TEMP_FILE')  # Local temp file for cache
+    excel_local = os.getenv('EXCEL_TEMP_FILE')
+    cache_local = os.getenv('JSON_TEMP_FILE')
 
     try:
         s3.download_file(BUCKET_NAME, EXCEL_KEY, excel_local)
@@ -141,10 +135,9 @@ def download_excel_and_cache():
     return excel_local, cache_local
 
 # =========================
-# SEND EMAIL (LINKS)
+# SEND EMAIL
 # =========================
 def send_admin_email_links(zip_links):
-
     msg = EmailMessage()
     msg["Subject"] = "Weekly Certificates 📦"
     msg["From"] = EMAIL_ADDRESS
@@ -164,24 +157,30 @@ def send_admin_email_links(zip_links):
     print("📧 Email sent with links")
 
 # =========================
-# CLEAN S3 CERTIFICATES
+# ✅ CLEAN S3 CERTIFICATES (UPDATED LOGIC)
 # =========================
 def clean_certificates_folder():
 
-    response = s3.list_objects_v2(
-        Bucket=BUCKET_NAME,
-        Prefix="certificates/"
-    )
+    paginator = s3.get_paginator('list_objects_v2')
 
     objects_to_delete = []
 
-    for obj in response.get("Contents", []):
-        key = obj["Key"]
+    for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix="certificates/"):
+        for obj in page.get("Contents", []):
+            key = obj["Key"]
 
-        if key == "certificates/":
-            continue
+            # Skip root
+            if key == "certificates/":
+                continue
 
-        objects_to_delete.append({"Key": key})
+            parts = key.split("/")
+
+            # KEEP only: certificates/course_name/template.pdf
+            if len(parts) == 3 and parts[2] == "template.pdf":
+                continue
+
+            # DELETE everything else
+            objects_to_delete.append({"Key": key})
 
     if objects_to_delete:
         s3.delete_objects(
@@ -189,14 +188,14 @@ def clean_certificates_folder():
             Delete={"Objects": objects_to_delete}
         )
 
-    print("🧹 Certificates cleaned")
+    print("🧹 Cleaned certificates (templates preserved)")
 
 # =========================
 # CLEAN LOCAL FILES
 # =========================
 def cleanup_local(files):
     for f in files:
-        if os.path.exists(f):
+        if f and os.path.exists(f):
             os.remove(f)
 
 # =========================
