@@ -243,14 +243,18 @@ def process_excel(file_path):
                 
                 print("Updating column values in DataFrame...")
                 sheets_data[sheet_name].loc[index, "Certificate_Issued"] = 1
+                print('1. Certificate_Issued set to 1')
                 sheets_data[sheet_name].loc[index, "Issue_Date"] = today_date
+                print('2. Issue_Date set to', today_date)
                 sheets_data[sheet_name].loc[index, "Certificate_ID"] = cert_id
+                print('3. Certificate_ID set to', cert_id)
                 sheets_data[sheet_name].loc[index, "Certificate_Path"] = s3_url
+                print('4. Certificate_Path set to', s3_url)
 
                 print("   ✓ Done")
                 os.remove(final_path)
 
-                print("   ✅ Certificates done")
+                print("   ✅ Certificates columns updated in DataFrame")
             except Exception as e:
                 print(f"   ❌ Error: {e}")
 
