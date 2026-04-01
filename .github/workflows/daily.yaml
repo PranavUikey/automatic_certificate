@@ -9,17 +9,25 @@ jobs:
 
         runs-on: ubuntu-latest
         env:
-            MOODLE_BASE_URL: ${{ secrets.MOODLE_BASE_URL }}
-            MOODLE_TOKEN: ${{ secrets.MOODLE_TOKEN }}
             AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
             AWS_REGION: ${{ secrets.AWS_REGION }}
-            EMAIL_USER: ${{ secrets.EMAIL_USER }}
-            EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
-            SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
-            SMTP_PORT: ${{ secrets.SMTP_PORT }}
+            AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            CERTIFICATES_DIRECTORY: ${{ secrets.CERTIFICATES_DIRECTORY }}
+            DRY_RUN: ${{ secrets.DRY_RUN }}
+            EMAIL_TEMPLATE: ${{ secrets.EMAIL_TEMPLATE }}
+            EXCEL_CERTIFICATES_SHEET: ${{ secrets.EXCEL_CERTIFICATES_SHEET }}
+            EXCEL_FILE: ${{ secrets.EXCEL_FILE }}
+            EXCEL_TEMP_FILE: ${{ secrets.EXCEL_TEMP_FILE }}
+            JSON_TEMP_FILE: ${{ secrets.JSON_TEMP_FILE }}
+            MOODLE_BASE_URL: ${{ secrets.MOODLE_BASE_URL }}
+            MOODLE_TOKEN: ${{ secrets.MOODLE_TOKEN }}
+            ORIG_JSON_FILE: ${{ secrets.ORIG_JSON_FILE }}
             ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+            EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+            SMTP_PORT: ${{ secrets.SMTP_PORT }}
+            SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+            SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
         steps:
             - name: Checkout Repository
               uses: actions/checkout@v2
