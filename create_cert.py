@@ -243,26 +243,21 @@ def process_excel(file_path):
                 os.remove(overlay_path)
 
                 s3_url = upload_certificate(final_path, sheet_name, current_year, current_month)
-                print(f"   🔗 Certificate URL: {s3_url}")
+
                 if not s3_url:
                     continue
 
                 
-                print("Updating column values in DataFrame...")
+
                 sheets_data[sheet_name].loc[index, "Certificate_Issued"] = 1
-                print('1. Certificate_Issued set to 1')
                 sheets_data[sheet_name].loc[index, "Certificate_ID"] = cert_id
-                print('2. Certificate_ID set to', cert_id)
                 sheets_data[sheet_name].loc[index, "Certificate_Path"] = s3_url
-                print('3. Certificate_Path set to', s3_url)
                 sheets_data[sheet_name].loc[index, "Issue_Date"] = today_date
-                print('4. Issue_Date set to', today_date)
                 
 
                 print("   ✓ Done")
                 os.remove(final_path)
 
-                print("   ✅ Certificates columns updated in DataFrame")
             except Exception as e:
                 print(f"   ❌ Error: {e}")
 

@@ -145,7 +145,7 @@ def main():
                 continue
 
             # Skip already sent (only in production)
-            if not DRY_RUN and df.at[index, 'Certificate_Sent'] == "Sent":
+            if not DRY_RUN and df.loc[index, 'Certificate_Sent'] == "Sent":
                 continue
 
             print(f"📧 Sending to: {email} (Original: {original_email})")
@@ -162,7 +162,7 @@ def main():
 
             # Update ONLY in production
             if not DRY_RUN:
-                df.at[index, 'Certificate_Sent'] = "Sent" if success else "Failed"
+                df.loc[index, 'Certificate_Sent'] = "Sent" if success else "Failed"
 
             time.sleep(DELAY_BETWEEN_EMAILS)
 
