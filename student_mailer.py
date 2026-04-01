@@ -104,7 +104,8 @@ def send_email(to_email, name, s3_url):
         )
 
     try:
-        with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as smtp:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as smtp:
+            smtp.starttls()
             smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             smtp.send_message(msg)
 
