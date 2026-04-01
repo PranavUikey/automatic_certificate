@@ -1,5 +1,3 @@
-
-
 import os
 import pandas as pd
 from datetime import datetime
@@ -33,19 +31,41 @@ s3 = boto3.client(
 )
 
 # =========================
-# DOWNLOAD TEMPLATE FROM S3
+# NORMALIZE COURSE NAME
+# =========================
+def normalize_course_name(name):
+    return name.strip().replace(" ", "_")
+
+# =========================
+# DOWNLOAD TEMPLATE (ROBUST)
 # =========================
 def download_template(course_name):
-    s3_key = f"certificates/{course_name}/template.pdf"
-    local_path = f"template_{course_name}.pdf"
 
-    try:
-        s3.download_file(BUCKET_NAME, s3_key, local_path)
-        print(f"📥 Template downloaded: {course_name}")
-        return local_path
-    except Exception as e:
-        print(f"❌ Template missing for {course_name}: {e}")
-        return None
+    original_name = course_name
+    course_name = normalize_course_name(course_name)
+
+    possible_keys = [
+        f"certificates/{course_name}/template.pdf",
+        f"certificates/{course_name}/template.PDF",
+        f"certificates/{course_name.lower()}/template.pdf",
+        f"certificates/{original_name.strip()}/template.pdf"
+    ]
+
+    for key in possible_keys:
+        try:
+            local_path = f"template_{course_name}.pdf"
+            print(f"🔍 Trying: {key}")
+
+            s3.download_file(BUCKET_NAME, key, local_path)
+
+            print(f"✅ Template found: {key}")
+            return local_path
+
+        except Exception:
+            continue
+
+    print(f"❌ Template NOT found for: {original_name}")
+    return None
 
 # =========================
 # DOWNLOAD EXCEL
@@ -53,16 +73,19 @@ def download_template(course_name):
 def download_excel():
     try:
         s3.download_file(BUCKET_NAME, EXCEL_KEY, LOCAL_FILE)
-        print("📥 Excel downloaded from S3")
+        print("📥 Excel downloaded")
         return True
     except Exception as e:
-        print(f"⚠ No Excel found: {e}")
+        print(f"⚠ Excel missing: {e}")
         return False
 
 # =========================
 # UPLOAD CERTIFICATE
 # =========================
 def upload_certificate(file_path, course, year, month):
+
+    course = normalize_course_name(course)
+
     file_name = os.path.basename(file_path)
     s3_key = f"certificates/{course}/{year}/{month}/{file_name}"
 
@@ -92,7 +115,7 @@ def upload_excel():
 # =========================
 def generate_certificate_id(course_name, student_id):
 
-    course_prefix_map = {
+    prefix_map = {
         "Python": "PY",
         "Data Science": "DS",
         "Gen AI": "AI",
@@ -101,7 +124,7 @@ def generate_certificate_id(course_name, student_id):
         "SQL": "SQ"
     }
 
-    prefix = course_prefix_map.get(course_name.strip(), "XX")
+    prefix = prefix_map.get(course_name.strip(), "XX")
     month_year = datetime.now().strftime("%m%y")
 
     return f"{prefix}-{month_year}-{int(student_id)}"
@@ -139,7 +162,7 @@ def create_overlay(output_file, name, certificate_id, date):
     c.save()
 
 # =========================
-# MERGE TEMPLATE + OVERLAY
+# MERGE PDF
 # =========================
 def generate_final_certificate(template_file, overlay_file, output_file):
 
@@ -172,7 +195,6 @@ def process_excel(file_path):
 
     sheets_data = {}
 
-    # Prepare sheets
     for sheet in xls.sheet_names:
         df = pd.read_excel(xls, sheet_name=sheet)
 
@@ -183,24 +205,23 @@ def process_excel(file_path):
         sheets_data[sheet] = df
 
     # ---------------------------
-    # PROCESS EACH COURSE
+    # PROCESS COURSES
     # ---------------------------
     for sheet_name, df in sheets_data.items():
 
         if df.empty:
             continue
 
-        course_name = sheet_name.strip()
+        print(f"\n📘 Processing: {sheet_name}")
 
-        template_path = download_template(course_name)
+        template_path = download_template(sheet_name)
 
         if not template_path:
+            print("⚠ Skipping course due to missing template")
             continue
 
-        output_folder = os.path.join("temp_output", course_name, current_year, current_month)
+        output_folder = os.path.join("temp_output", normalize_course_name(sheet_name), current_year, current_month)
         os.makedirs(output_folder, exist_ok=True)
-
-        print(f"\n📘 Processing: {course_name}")
 
         for index, row in df.iterrows():
 
@@ -211,7 +232,7 @@ def process_excel(file_path):
                 name = str(row["Name"]).strip()
                 student_id = int(row["ID"])
 
-                cert_id = generate_certificate_id(course_name, student_id)
+                cert_id = generate_certificate_id(sheet_name, student_id)
 
                 overlay_path = os.path.join(output_folder, f"overlay_{student_id}.pdf")
                 final_path = os.path.join(output_folder, f"{name.replace(' ', '_')}_{student_id}.pdf")
@@ -221,15 +242,13 @@ def process_excel(file_path):
 
                 os.remove(overlay_path)
 
-                # Upload
-                s3_url = upload_certificate(final_path, course_name, current_year, current_month)
+                s3_url = upload_certificate(final_path, sheet_name, current_year, current_month)
 
                 if not s3_url:
                     continue
 
                 os.remove(final_path)
 
-                # Update Excel
                 sheets_data[sheet_name].loc[index, "Certificate_Issued"] = 1
                 sheets_data[sheet_name].loc[index, "Issue_Date"] = today_date
                 sheets_data[sheet_name].loc[index, "Certificate_ID"] = cert_id
@@ -240,18 +259,18 @@ def process_excel(file_path):
             except Exception as e:
                 print(f"   ❌ Error: {e}")
 
-        # Delete template after course
+        # Cleanup template
         if os.path.exists(template_path):
             os.remove(template_path)
 
-    # Save Excel
+    # SAVE EXCEL
     with pd.ExcelWriter(LOCAL_FILE, engine="openpyxl") as writer:
         for sheet, df in sheets_data.items():
             df.to_excel(writer, sheet_name=sheet[:31], index=False)
 
     upload_excel()
 
-    print("\n🎉 All certificates generated & uploaded!")
+    print("\n🎉 Certificates generated & uploaded successfully!")
 
 # =========================
 # ENTRY POINT
