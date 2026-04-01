@@ -191,9 +191,16 @@ def process_excel(file_path):
     for sheet in xls.sheet_names:
         df = pd.read_excel(xls, sheet_name=sheet)
 
+        # Ensure columns exist
         for col in ["Certificate_Issued", "Issue_Date", "Certificate_ID", "Certificate_Path"]:
             if col not in df.columns:
                 df[col] = "" if col != "Certificate_Issued" else 0
+
+        # ✅ FORCE correct types
+        df["Certificate_Issued"] = df["Certificate_Issued"].fillna(0).astype(int)
+        df["Certificate_ID"] = df["Certificate_ID"].astype(str)
+        df["Certificate_Path"] = df["Certificate_Path"].astype(str)
+        df["Issue_Date"] = df["Issue_Date"].astype(str)
 
         sheets_data[sheet] = df
 
