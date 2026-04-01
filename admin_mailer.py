@@ -15,12 +15,12 @@ BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')
 EXCEL_KEY = os.getenv('EXCEL_FILE')
 CACHE_KEY = os.getenv('ORIG_JSON_FILE')
 
-EMAIL_ADDRESS = os.getenv('SMTP_EMAIL')
+EMAIL_ADDRESS = os.getenv('SMTP_USERNAME')
 EMAIL_PASSWORD = os.getenv('SMTP_PASSWORD')
 SMTP_SERVER = os.getenv('SMTP_SERVER')
 SMTP_PORT = int(os.getenv('SMTP_PORT'))
 
-ADMIN_EMAIL = os.getenv('ADMIN_EMAIL')
+ADMIN_EMAIL = os.getenv('SMTP_ADMIN_EMAIL')
 
 # =========================
 # S3 SETUP
