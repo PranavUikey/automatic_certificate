@@ -30,11 +30,7 @@ s3 = boto3.client(
     region_name=os.getenv('AWS_REGION')
 )
 
-# =========================
-# NORMALIZE COURSE NAME
-# =========================
-def normalize_course_name(name):
-    return name.strip().replace(" ", "_")
+
 
 # =========================
 # DOWNLOAD TEMPLATE (ROBUST)
@@ -42,7 +38,6 @@ def normalize_course_name(name):
 def download_template(course_name):
 
     original_name = course_name
-    course_name = normalize_course_name(course_name)
 
     possible_keys = [
         f"certificates/{course_name}/template.pdf",
@@ -84,7 +79,7 @@ def download_excel():
 # =========================
 def upload_certificate(file_path, course, year, month):
 
-    course = normalize_course_name(course)
+
 
     file_name = os.path.basename(file_path)
     s3_key = f"certificates/{course}/{year}/{month}/{file_name}"
@@ -220,7 +215,7 @@ def process_excel(file_path):
             print("⚠ Skipping course due to missing template")
             continue
 
-        output_folder = os.path.join("temp_output", normalize_course_name(sheet_name), current_year, current_month)
+        output_folder = os.path.join("temp_output", sheet_name, current_year, current_month)
         os.makedirs(output_folder, exist_ok=True)
 
         for index, row in df.iterrows():
@@ -247,7 +242,7 @@ def process_excel(file_path):
                 if not s3_url:
                     continue
 
-                os.remove(final_path)
+                
 
                 sheets_data[sheet_name].loc[index, "Certificate_Issued"] = 1
                 sheets_data[sheet_name].loc[index, "Issue_Date"] = today_date
@@ -255,7 +250,7 @@ def process_excel(file_path):
                 sheets_data[sheet_name].loc[index, "Certificate_Path"] = s3_url
 
                 print("   ✓ Done")
-
+                os.remove(final_path)
             except Exception as e:
                 print(f"   ❌ Error: {e}")
 
