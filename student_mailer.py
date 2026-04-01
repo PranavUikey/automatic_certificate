@@ -23,7 +23,7 @@ SMTP_SERVER = os.getenv('SMTP_SERVER')
 SMTP_PORT = int(os.getenv('SMTP_PORT'))
 
 DRY_RUN = os.getenv('DRY_RUN', 'True').lower() in ('true', '1', 't')  # Default to True for safety
-TEST_EMAIL = os.getenv('ADMIN_EMAIL')
+TEST_EMAIL = os.getenv('SMTP_ADMIN_EMAIL')
 
 BUCKET_NAME = os.getenv('AWS_BUCKET_NAME')  # S3 bucket name
 LOCAL_FILE = os.getenv('EXCEL_TEMP_FILE')  # Local temp file for processing
