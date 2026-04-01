@@ -9,7 +9,7 @@ jobs:
 
         runs-on: ubuntu-latest
         env:
-            MOODLE_URL: ${{ secrets.MOODLE_URL }}
+            MOODLE_BASE_URL: ${{ secrets.MOODLE_BASE_URL }}
             MOODLE_TOKEN: ${{ secrets.MOODLE_TOKEN }}
             AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
